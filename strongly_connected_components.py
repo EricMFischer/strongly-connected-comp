@@ -68,6 +68,11 @@ def preprocess_adj_list(filename):
             u = int(u)
             v = int(v)
             graph_object.setdefault(u, []).append(v)
+
+            # do not forget nodes with no outgoing arcs
+            if v not in graph_object:
+                graph_object.setdefault(v, [])
+
     return graph_object
 
 
@@ -203,74 +208,66 @@ class Graph(object):
 
 
 # Global variables
-# Tracks the explored nodes
 explored = {}
-# On 1st DFS loop, this tracks the finishing times of each node
-f = {}
-# On 2nd DFS loop, this tracks the leader for every node
-leader = {}
+# 1st DFS loop
+F = {}  # tracks the finishing time of each node
+t = 0  # tracks visited nodes
+# 2nd DFS loop
+leader = {}  # tracks the leader of each node
+S = []  # most recent "leader" vertex from which DFS was called
 
 
-# input: a Graph, vertex key, the iteration of DFS loop (1st or 2nd), t, and s
-def DFS_G(G, v_key, loop_iter, t, s):
+# input: Graph, vertex key, iteration of DFS loop (1st or 2nd)
+def DFS_G(G, v_key, loop_iter):
+    global t, s, explored
     explored[v_key] = 1
+    print('explored: ', explored)
 
-    # On 2nd DFS loop, leader of a vertex is the one DFS was called from to dicover it
+    # On 2nd DFS loop, leader of vertex is one from which DFS was called to dicover it
     if loop_iter is 2:
-        leader[v_key] = s
+        leader[v_key] = S
 
     v_nbrs = G.get_v(v_key).get_nbr_keys()
     for v_nbr in v_nbrs:
         if v_nbr not in explored:
-            t, s = DFS_G(G, v_nbr, loop_iter, t, s)
+            DFS_G(G, v_nbr, loop_iter)
 
     # On 1st DFS loop, increment t when v_key has no more outgoing arcs
+    # And record that the finishing time F for v_key was t
     if loop_iter is 1:
         t += 1
-        f[v_key] = t
-
-    return t, s
+        F[v_key] = t
 
 
-# input: a Graph and the iteration of DFS loop (1st or 2nd)
+# input: Graph, iteration of DFS loop (1 or 2)
 def DFS_loop(G, loop_iter):
-    # Clear explored nodes for 2nd call of DFS_loop
+    global S, explored
+    # Empty explored for 2nd iteration of DFS loop
     explored = {}
-    # t -> tracks visited nodes; for finishing times during first DFS call on Grev
-    t = 0
-    # s -> most recent "leader" vertex from which DFS was called during second DFS call on G
-    # (Topologically order nodes in decreasing order of finishing times)
-    s = None
 
     G_rev_keys = list(reversed(G.get_v_keys()))
-    print(G_rev_keys)
     for v_key in G_rev_keys:
         if v_key not in explored:
-            s = v_key  # tracks the current source vertex for a DFS call
-            t, s = DFS_G(G, v_key, loop_iter, t, s)
-
-    print('t: ', t)
-    print('s: ', s)
+            S.append(v_key)  # tracks the current source vertex for a DFS call
+            DFS_G(G, v_key, loop_iter)
 
 
-# input: a Graph
-# output: size of the 5 largest SCCs (e.g. [500,400,300,200,100])
+# input: Graph
+# output: size of 5 largest SCCs e.g. [500,400,300,200,100]
 def strongly_connected_components(G):
-    # 1) Run DFS loop on G in reverse
+    # 1) Run DFS loop on G in reversed
+    # Topologically order nodes in decreasing order of finishing times
     Grev = G  # to do
     DFS_loop(Grev, 1)
 
-    print('explored: ', explored)
-    print('f: ', f)
-
-    # 2) Run DFS loop again on original graph G
+    # 2) Run DFS loop again on original G
     # DFS_loop(G, 2)
 
-    return []  # return 5 largest SCCs
+    return []
 
 
 graph_object = preprocess_adj_list('scc_test_1.txt')
-pprint.pprint(graph_object, width=260)
+pprint.pprint(graph_object, width=40)
 
 graph = create_graph(graph_object)
 
