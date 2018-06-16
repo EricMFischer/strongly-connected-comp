@@ -75,44 +75,43 @@ def preprocess_adj_list(filename):
 # output: Graph object instantiated with input graph object
 def create_graph(graph_obj):
     graph = Graph()
-    for vertex_key in graph_obj:
-        vertex = Vertex(vertex_key)
-        for neighbor_key in graph_obj[vertex_key]:
-            vertex.add_neighbor(neighbor_key)
-        graph.add_vertex(vertex)
+    for v_key in graph_obj:
+        v = Vertex(v_key)
+        for neighbor_key in graph_obj[v_key]:
+            v.add_nbr(neighbor_key)
+        graph.add_v(v)
     return graph
 
 
 # Vertex class (vertices are objects with 'key' and 'neighbors' keys)
-# Modifying these Vertex objects can make the graph more robust
 class Vertex(object):
     def __init__(self, key):
         self.key = key
-        self.neighbors = {}
+        self.nbrs = {}
 
     def __str__(self):
         return '{' + "'key': '{}', 'neighbors': {}".format(
             self.key,
-            self.neighbors
+            self.nbrs
         ) + '}'
 
-    def add_neighbor(self, neighbor_key, weight=1):
-        if (neighbor_key):
-            self.neighbors[neighbor_key] = weight
+    def add_nbr(self, nbr_key, weight=1):
+        if (nbr_key):
+            self.nbrs[nbr_key] = weight
 
-    def has_neighbor(self, neighbor_key):
-        return neighbor_key in self.neighbors
+    def has_nbr(self, nbr_key):
+        return nbr_key in self.nbrs
 
-    def get_neighbor_keys(self):
-        return list(self.neighbors.keys())
+    def get_nbr_keys(self):
+        return list(self.nbrs.keys())
 
-    def remove_neighbor(self, neighbor_key):
-        if neighbor_key in self.neighbors:
-            del self.neighbors[neighbor_key]
+    def remove_nbr(self, nbr_key):
+        if nbr_key in self.nbrs:
+            del self.nbrs[nbr_key]
 
-    def get_weight(self, neighbor_key):
-        if neighbor_key in self.neighbors:
-            return self.neighbors[neighbor_key]
+    def get_weight(self, nbr_key):
+        if nbr_key in self.nbrs:
+            return self.nbrs[nbr_key]
 
 
 # Graph class
@@ -133,36 +132,36 @@ class Graph(object):
     def __str__(self):
         output = '\n{\n'
         vertices = self.vertices.values()
-        for vertex in vertices:
-            graph_key = "'{}'".format(vertex.key)
-            vertex_str = "\n   'key': '{}', \n   'neighbors': {}".format(
-                vertex.key,
-                vertex.neighbors
+        for v in vertices:
+            graph_key = "'{}'".format(v.key)
+            v_str = "\n   'key': '{}', \n   'neighbors': {}".format(
+                v.key,
+                v.neighbors
             )
-            output += ' ' + graph_key + ': {' + vertex_str + '\n },\n'
+            output += ' ' + graph_key + ': {' + v_str + '\n },\n'
         return output + '}'
 
-    def add_vertex(self, vertex):
-        if vertex:
-            self.vertices[vertex.key] = vertex
+    def add_v(self, v):
+        if v:
+            self.vertices[v.key] = v
         # temporary logic
         return self
 
-    def get_vertex(self, key):
+    def get_v(self, key):
         try:
             return self.vertices[key]
         except KeyError:
             return None
 
-    def get_vertices_keys(self):
+    def get_v_keys(self):
         return list(self.vertices.keys())
 
     # removes vertex as neighbor from all its neighbors, then deletes vertex
-    def remove_vertex(self, key):
+    def remove_v(self, key):
         if key in self.vertices:
-            neighbor_keys = self.vertices[key].get_neighbor_keys()
-            for neighbor_key in neighbor_keys:
-                self.remove_edge(neighbor_key, key)
+            nbr_keys = self.vertices[key].get_nbr_keys()
+            for nbr_key in nbr_keys:
+                self.remove_edge(nbr_key, key)
             del self.vertices[key]
         # temporary logic
         return self
@@ -170,73 +169,102 @@ class Graph(object):
     # overwrites the weight for an edge if it exists already, with a default of 1
     def add_edge(self, from_key, to_key, weight=1):
         if from_key not in self.vertices:
-            self.add_vertex(Vertex(from_key))
+            self.add_v(Vertex(from_key))
         if to_key not in self.vertices:
-            self.add_vertex(Vertex(to_key))
+            self.add_v(Vertex(to_key))
 
-        self.vertices[from_key].add_neighbor(to_key, weight)
+        self.vertices[from_key].add_nbr(to_key, weight)
 
     # adds the weight for an edge if it exists already, with a default of 1
     def increase_edge(self, from_key, to_key, weight=1):
         if from_key not in self.vertices:
-            self.add_vertex(Vertex(from_key))
+            self.add_v(Vertex(from_key))
         if to_key not in self.vertices:
-            self.add_vertex(Vertex(to_key))
+            self.add_v(Vertex(to_key))
 
-        weight_v1_v2 = self.get_vertex(from_key).get_weight(to_key)
+        weight_v1_v2 = self.get_v(from_key).get_weight(to_key)
         new_weight_v1_v2 = weight_v1_v2 + weight if weight_v1_v2 else weight
 
-        self.vertices[from_key].add_neighbor(to_key, new_weight_v1_v2)
+        self.vertices[from_key].add_nbr(to_key, new_weight_v1_v2)
         # temporary logic
         return self
 
     def has_edge(self, from_key, to_key):
         if from_key in self.vertices:
-            return self.vertices[from_key].has_neighbor(to_key)
+            return self.vertices[from_key].has_nbr(to_key)
 
     def remove_edge(self, from_key, to_key):
         if from_key in self.vertices:
-            self.vertices[from_key].remove_neighbor(to_key)
+            self.vertices[from_key].remove_nbr(to_key)
 
-    def for_each_vertex(self, cb):
-        for vertex in self.vertices:
-            cb(vertex)
+    def for_each_v(self, cb):
+        for v in self.vertices:
+            cb(v)
 
 
-# Global variables for strongly connected components algorithm
+# Global variables
+# Tracks the explored nodes
 explored = {}
+# On 1st DFS loop, this tracks the finishing times of each node
+f = {}
+# On 2nd DFS loop, this tracks the leader for every node
+leader = {}
 
 
-# input: a Graph and vertex
-def DFS(G, v):
-    explored[v] = 1
+# input: a Graph, vertex key, the iteration of DFS loop (1st or 2nd), t, and s
+def DFS_G(G, v_key, loop_iter, t, s):
+    explored[v_key] = 1
+
+    # On 2nd DFS loop, leader of a vertex is the one DFS was called from to dicover it
+    if loop_iter is 2:
+        leader[v_key] = s
+
+    v_nbrs = G.get_v(v_key).get_nbr_keys()
+    for v_nbr in v_nbrs:
+        if v_nbr not in explored:
+            t, s = DFS_G(G, v_nbr, loop_iter, t, s)
+
+    # On 1st DFS loop, increment t when v_key has no more outgoing arcs
+    if loop_iter is 1:
+        t += 1
+        f[v_key] = t
+
+    return t, s
 
 
-# input: a Graph
-def DFS_loop(G):
-    # Compute t, number of nodes so far processed, for finishing times during first DFS on Grev
+# input: a Graph and the iteration of DFS loop (1st or 2nd)
+def DFS_loop(G, loop_iter):
+    # Clear explored nodes for 2nd call of DFS_loop
+    explored = {}
+    # t -> tracks visited nodes; for finishing times during first DFS call on Grev
     t = 0
-
-    # Compute s, most recent "leader" vertex from which DFS was called, during second DFS on G
-    # Topologically order nodes in decreasing order of finishing times
+    # s -> most recent "leader" vertex from which DFS was called during second DFS call on G
+    # (Topologically order nodes in decreasing order of finishing times)
     s = None
 
-    G_rev_keys = list(reversed(G.vertices.keys()))
-    for v in G_rev_keys:
-        if v not in explored:
-            s = v  # tracks current source vertex for DFS call
-            DFS(G, v)
+    G_rev_keys = list(reversed(G.get_v_keys()))
+    print(G_rev_keys)
+    for v_key in G_rev_keys:
+        if v_key not in explored:
+            s = v_key  # tracks the current source vertex for a DFS call
+            t, s = DFS_G(G, v_key, loop_iter, t, s)
+
+    print('t: ', t)
+    print('s: ', s)
 
 
 # input: a Graph
 # output: size of the 5 largest SCCs (e.g. [500,400,300,200,100])
 def strongly_connected_components(G):
     # 1) Run DFS loop on G in reverse
-    Grev = {}  # to do
-    DFS_loop(Grev)
+    Grev = G  # to do
+    DFS_loop(Grev, 1)
+
+    print('explored: ', explored)
+    print('f: ', f)
 
     # 2) Run DFS loop again on original graph G
-    DFS_loop(G)
+    # DFS_loop(G, 2)
 
     return []  # return 5 largest SCCs
 
@@ -246,9 +274,5 @@ pprint.pprint(graph_object, width=260)
 
 graph = create_graph(graph_object)
 
-
-
-
-
-
-
+result = strongly_connected_components(graph)
+print(result)
