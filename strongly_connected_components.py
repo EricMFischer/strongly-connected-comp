@@ -59,7 +59,7 @@ import pprint
 
 
 # input: file name
-# output: object with vertex keys as keys and their neighbors as values
+# output: object with vertex keys and their neighbors
 def preprocess_adj_list(filename):
     graph_object = {}
     with open(filename) as f_handle:
@@ -76,52 +76,70 @@ def preprocess_adj_list(filename):
     return graph_object
 
 
-# input: object with vertex keys as keys and their neighbors as values
-# output: Graph object instantiated with input graph object
+# input: object with vertex keys and their neighbors
+# output: Graph instantiated with input graph object
 def create_graph(graph_obj):
     graph = Graph()
     for v_key in graph_obj:
         v = Vertex(v_key)
-        for neighbor_key in graph_obj[v_key]:
-            v.add_nbr(neighbor_key)
+        for nbr_key in graph_obj[v_key]:
+            v.add_head(nbr_key)
         graph.add_v(v)
     return graph
 
 
-# Vertex class (vertices are objects with 'key' and 'neighbors' keys)
+# Vertex class for directed graphs (object with 'key', 'tail_of', and 'head_of' keys)
 class Vertex(object):
     def __init__(self, key):
         self.key = key
-        self.nbrs = {}
+        self.tail_of = {}
+        self.head_of = {}
 
     def __str__(self):
-        return '{' + "'key': '{}', 'neighbors': {}".format(
+        return '{' + "'key': '{}', 'tail_of': {}, 'head_of': {}".format(
             self.key,
-            self.nbrs
+            self.tail_of,
+            self.head_of
         ) + '}'
 
-    def add_nbr(self, nbr_key, weight=1):
-        if (nbr_key):
-            self.nbrs[nbr_key] = weight
+    def add_head(self, head_key, weight=1):
+        if (head_key):
+            self.tail_of[head_key] = weight
 
-    def has_nbr(self, nbr_key):
-        return nbr_key in self.nbrs
+    def add_tail(self, tail_key, weight=1):
+        if (tail_key):
+            self.head_of[tail_key] = weight
 
-    def get_nbr_keys(self):
-        return list(self.nbrs.keys())
+    def tail_of(self, head_key):
+        return head_key in self.tail_of
 
-    def remove_nbr(self, nbr_key):
-        if nbr_key in self.nbrs:
-            del self.nbrs[nbr_key]
+    def head_of(self, tail_key):
+        return tail_key in self.head_of
 
-    def get_weight(self, nbr_key):
-        if nbr_key in self.nbrs:
-            return self.nbrs[nbr_key]
+    def get_tail_of_keys(self):
+        return list(self.tail_of.keys())
+
+    def get_head_of_keys(self):
+        return list(self.head_of.keys())
+
+    def remove_tail(self, tail_key):
+        if tail_key in self.head_of:
+            del self.head_of[tail_key]
+
+    def remove_head(self, head_key):
+        if head_key in self.tail_of:
+            del self.tail_of[head_key]
+
+    def get_tail_weight(self, tail_key):
+        if tail_key in self.head_of:
+            return self.head_of[tail_key]
+
+    def get_head_weight(self, head_key):
+        if head_key in self.tail_of:
+            return self.tail_of[head_key]
 
 
-# Graph class
-# Note: to maximize applications, add_edge, increase_edge, and remove_edge only add or remove an
-# edge for the 'from' vertex, and 'has_edge' only checks the 'from' vertex.
+# Graph class for directed graphs
 class Graph(object):
     def __init__(self):
         self.vertices = {}
@@ -139,9 +157,10 @@ class Graph(object):
         vertices = self.vertices.values()
         for v in vertices:
             graph_key = "'{}'".format(v.key)
-            v_str = "\n   'key': '{}', \n   'neighbors': {}".format(
+            v_str = "\n   'key': '{}', \n   'tail_of': {}, \n   'head_of': {}".format(
                 v.key,
-                v.neighbors
+                v.tail_of,
+                v.head_of
             )
             output += ' ' + graph_key + ': {' + v_str + '\n },\n'
         return output + '}'
@@ -149,7 +168,6 @@ class Graph(object):
     def add_v(self, v):
         if v:
             self.vertices[v.key] = v
-        # temporary logic
         return self
 
     def get_v(self, key):
@@ -161,46 +179,61 @@ class Graph(object):
     def get_v_keys(self):
         return list(self.vertices.keys())
 
-    # removes vertex as neighbor from all its neighbors, then deletes vertex
+    # removes vertex as head and tail from all its neighbors, then deletes vertex
     def remove_v(self, key):
         if key in self.vertices:
-            nbr_keys = self.vertices[key].get_nbr_keys()
-            for nbr_key in nbr_keys:
-                self.remove_edge(nbr_key, key)
+            head_of_keys = self.vertices[key].get_head_of_keys()
+            tail_of_keys = self.vertices[key].get_tail_of_keys()
+            for tail_key in head_of_keys:
+                self.remove_head(tail_key, key)
+            for head_key in tail_of_keys:
+                self.remove_tail(key, head_key)
             del self.vertices[key]
-        # temporary logic
         return self
 
-    # overwrites the weight for an edge if it exists already, with a default of 1
-    def add_edge(self, from_key, to_key, weight=1):
-        if from_key not in self.vertices:
-            self.add_v(Vertex(from_key))
-        if to_key not in self.vertices:
-            self.add_v(Vertex(to_key))
+    def add_edge(self, tail_key, head_key, weight=1):
+        if tail_key not in self.vertices:
+            self.add_v(Vertex(tail_key))
+        if head_key not in self.vertices:
+            self.add_v(Vertex(head_key))
 
-        self.vertices[from_key].add_nbr(to_key, weight)
+        self.vertices[tail_key].add_head(head_key, weight)
+        self.vertices[head_key].add_tail(tail_key, weight)
 
     # adds the weight for an edge if it exists already, with a default of 1
-    def increase_edge(self, from_key, to_key, weight=1):
-        if from_key not in self.vertices:
-            self.add_v(Vertex(from_key))
-        if to_key not in self.vertices:
-            self.add_v(Vertex(to_key))
+    def increase_edge(self, tail_key, head_key, weight=1):
+        if tail_key not in self.vertices:
+            self.add_v(Vertex(tail_key))
+        if head_key not in self.vertices:
+            self.add_v(Vertex(head_key))
 
-        weight_v1_v2 = self.get_v(from_key).get_weight(to_key)
+        weight_v1_v2 = self.get_v(tail_key).get_head_weight(head_key)
         new_weight_v1_v2 = weight_v1_v2 + weight if weight_v1_v2 else weight
 
-        self.vertices[from_key].add_nbr(to_key, new_weight_v1_v2)
-        # temporary logic
+        weight_v2_v1 = self.get_v(head_key).get_tail_weight(tail_key)
+        new_weight_v2_v1 = weight_v2_v1 + weight if weight_v2_v1 else weight
+
+        self.vertices[tail_key].add_head(head_key, new_weight_v1_v2)
+        self.vertices[head_key].add_tail(tail_key, new_weight_v2_v1)
         return self
 
-    def has_edge(self, from_key, to_key):
-        if from_key in self.vertices:
-            return self.vertices[from_key].has_nbr(to_key)
+    def has_forward_edge(self, tail_key, head_key):
+        if tail_key in self.vertices:
+            return self.vertices[tail_key].tail_of(head_key)
 
-    def remove_edge(self, from_key, to_key):
-        if from_key in self.vertices:
-            self.vertices[from_key].remove_nbr(to_key)
+    def remove_edge(self, tail_key, head_key):
+        if tail_key in self.vertices:
+            self.vertices[tail_key].remove_head(head_key)
+        if head_key in self.vertices:
+            self.vertices[head_key].remove_tail(tail_key)
+
+    def remove_tail(self, tail_key, head_key):
+        if head_key in self.vertices:
+            self.vertices[head_key].remove_tail(tail_key)
+
+    def remove_head(self, tail_key, head_key):
+        if tail_key in self.vertices:
+            self.vertices[tail_key].remove_head(head_key)
 
     def for_each_v(self, cb):
         for v in self.vertices:
@@ -227,7 +260,7 @@ def DFS_G(G, v_key, loop_iter):
     if loop_iter is 2:
         leader[v_key] = S
 
-    v_nbrs = G.get_v(v_key).get_nbr_keys()
+    v_nbrs = G.get_v(v_key).get_tail_of_keys()
     for v_nbr in v_nbrs:
         if v_nbr not in explored:
             DFS_G(G, v_nbr, loop_iter)
