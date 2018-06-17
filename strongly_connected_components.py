@@ -59,33 +59,40 @@ import pprint
 
 
 # input: file name
-# output: object with vertex keys and their neighbors
+# output: object with vertex keys and their head vertices
 def preprocess_adj_list(filename):
-    graph_object = {}
+    graph_obj = {}
     with open(filename) as f_handle:
         for line in f_handle:
             u, v = line.split()
             u = int(u)
             v = int(v)
-            graph_object.setdefault(u, []).append(v)
+            graph_obj.setdefault(u, []).append(v)
 
-            # do not forget nodes with no outgoing arcs
-            if v not in graph_object:
-                graph_object.setdefault(v, [])
+            # dont forget nodes with no outgoing arcs
+            if v not in graph_obj:
+                graph_obj.setdefault(v, [])
 
-    return graph_object
+    return graph_obj
 
 
-# input: object with vertex keys and their neighbors
+# input: object with vertex keys and their head vertices
 # output: Graph instantiated with input graph object
 def create_graph(graph_obj):
-    graph = Graph()
+    G = Graph()
     for v_key in graph_obj:
-        v = Vertex(v_key)
-        for nbr_key in graph_obj[v_key]:
-            v.add_head(nbr_key)
-        graph.add_v(v)
-    return graph
+        v = Vertex(v_key) if v_key not in G else G.get_v(v_key)
+        for head_key in graph_obj[v_key]:
+            # v gets a tail_of value of head_key (useful for normal graph traversal)
+            v.add_head(head_key)
+
+            # v_head gets a head_of value of v_key (useful for traversing graph backwards)
+            v_head = Vertex(head_key) if head_key not in G else G.get_v(head_key)
+            v_head.add_tail(v_key)
+            G.add_v(v_head)
+
+        G.add_v(v)
+    return G
 
 
 # Vertex class for directed graphs (object with 'key', 'tail_of', and 'head_of' keys)
@@ -247,7 +254,7 @@ F = {}  # tracks the finishing time of each node
 t = 0  # tracks visited nodes
 # 2nd DFS loop
 leader = {}  # tracks the leader of each node
-S = []  # most recent "leader" vertex from which DFS was called
+S = []  # tracks most recent source or "leader" vertex from which DFS was called
 
 
 # input: Graph, vertex key, iteration of DFS loop (1st or 2nd)
@@ -256,17 +263,18 @@ def DFS_G(G, v_key, loop_iter):
     explored[v_key] = 1
     print('explored: ', explored)
 
-    # On 2nd DFS loop, leader of vertex is one from which DFS was called to dicover it
+    # On 2nd DFS loop, leader of a vertex is its DFS source vertex
     if loop_iter is 2:
-        leader[v_key] = S
+        leader[v_key] = S.pop()
 
-    v_nbrs = G.get_v(v_key).get_tail_of_keys()
-    for v_nbr in v_nbrs:
-        if v_nbr not in explored:
-            DFS_G(G, v_nbr, loop_iter)
+    v = G.get_v(v_key)
+    v_heads = v.get_tail_of_keys() if loop_iter is 2 else v.get_head_of_keys()
+    for v_head in v_heads:
+        if v_head not in explored:
+            DFS_G(G, v_head, loop_iter)
 
-    # On 1st DFS loop, increment t when v_key has no more outgoing arcs
-    # And record that the finishing time F for v_key was t
+    # On 1st DFS loop, when v_key has no more outgoing arcs, t is incremented
+    # and recorded as the finishing time of v_key
     if loop_iter is 1:
         t += 1
         F[v_key] = t
@@ -275,34 +283,44 @@ def DFS_G(G, v_key, loop_iter):
 # input: Graph, iteration of DFS loop (1 or 2)
 def DFS_loop(G, loop_iter):
     global S, explored
-    # Empty explored for 2nd iteration of DFS loop
     explored = {}
 
     G_rev_keys = list(reversed(G.get_v_keys()))
     for v_key in G_rev_keys:
         if v_key not in explored:
-            S.append(v_key)  # tracks the current source vertex for a DFS call
+            S.append(v_key)
             DFS_G(G, v_key, loop_iter)
 
 
 # input: Graph
-# output: size of 5 largest SCCs e.g. [500,400,300,200,100]
+# output: size of 5 largest SCCs
 def strongly_connected_components(G):
-    # 1) Run DFS loop on G in reversed
-    # Topologically order nodes in decreasing order of finishing times
-    Grev = G  # to do
-    DFS_loop(Grev, 1)
+    # 1) Run DFS loop on G backwards to topologically order nodes in dec. order of finishing times
+    DFS_loop(G, 1)
+    print('F: ', F)
+    print('t: ', t)
+    print('leader: ', leader)
+    print('S: ', S)
+
+    # 1b) Now that we have the searched order finishing times of the first DFS, replace vertex keys
+    # (i.e. node labels) with these rankings, so that when we now traverse the graph in the forward
+    # direction, but again in the order of n to 1 (which will thus be in decreasing order of
+    # finishing times), we'll start at the right nodes to find only 1 strongly connected component
+    # at a time (marking as 'explored' nodes that are part of 1 SCC so we don't ever call DFS from
+    # them in DFS_loop), potentially even starting with sink vertices which have no outgoing arcs
+    # and are thus their own SCC.
 
     # 2) Run DFS loop again on original G
-    # DFS_loop(G, 2)
+    DFS_loop(G, 2)
 
     return []
 
 
-graph_object = preprocess_adj_list('scc_test_1.txt')
-pprint.pprint(graph_object, width=40)
+graph_obj = preprocess_adj_list('scc_test_1.txt')
+pprint.pprint(graph_obj, width=40)
 
-graph = create_graph(graph_object)
+graph = create_graph(graph_obj)
+print(graph)
 
 result = strongly_connected_components(graph)
 print(result)
