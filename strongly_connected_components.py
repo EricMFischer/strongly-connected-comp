@@ -15,26 +15,6 @@ computes the sizes of the five largest SCCs to be 500, 400, 300, 200 and 100, th
 answer should be "500,400,300,200,100" (without the quotes). If your algorithm finds less
 than 5 SCCs, then write 0 for the remaining terms.
 
-General Approach:
-Here's how to do the vector f(t). Using Tim's example of the reversed 9 node graph (Grev) from
-the lectures:
-Initialize global variable t = 0. Initialize a stack data structure to empty. S = [ ].
-Start at vertex 9. Add to stack, S = [ 9 ]. Mark 9 visited.
-Always examine vertex at top of stack. 9 has outgoing edge to 6. So S.push(9). S = [ 9 6 ].
-Mark 6 visited.
-6 has outgoing edge 3. So, S.push(3). S = [ 9 6 3 ]. Mark 3 visited.
-3 has no outgoing edge that has not yet been visited. So pop 3, increment t, and assign
-f(3) = 1. Now t = 1 and S = [ 9 6 ].
-6 has an outgoing edge that has not yet been visited. So push 8. S = [ 9 6 8 ]. Mark 8 visited.
-Similarly, push 2 and 5. S = [ 9 6 8 2 5 ]. Mark 2 and 5 visited.
-Now, examine top of stack as always. 5 has nothing outgoing that has not yet been visited, so
-pop 5, increment t, assign f(5) = 2. Now t = 2 and S = [ 9 6 8 2 ].
-Examine top of stack. 2 has nothing outgoing that has not yet been visited, so pop 2,
-increment t, and assign f(2) = 3. Now t = 3.
-
-And so on ...
-
-
 Random Notes:
 1) Iterative > recursive approach.
 2) For running times, use stack to store the vertices. Dictionary for times.
@@ -248,59 +228,66 @@ class Graph(object):
 
 
 # Global variables
-explored = {}
+EXPLORED = {}
 # 1st DFS loop
-F = {}  # tracks the finishing time of each node
-t = 0  # tracks visited nodes
+t = 0  # increment when a node and its children have been fully explored
+F = []  # tracks node finishing times (e.g. [x,y,z] for 3 nodes labeled 1, 2, and 3)
+
 # 2nd DFS loop
-leader = {}  # tracks the leader of each node
-S = []  # tracks most recent source or "leader" vertex from which DFS was called
+S = []  # append a node before DFS_G subroutine is called from it
+LEADERS = {}  # tracks node "leaders", i.e. node DFS_G was called from to discover them
 
 
 # input: Graph, vertex key, iteration of DFS loop (1st or 2nd)
-def DFS_G(G, v_key, loop_iter):
-    global t, s, explored
-    explored[v_key] = 1
-    print('explored: ', explored)
+def DFS_G(G, v_key, loop):
+    global t, EXPLORED
+    EXPLORED[v_key] = 1
 
-    # On 2nd DFS loop, leader of a vertex is its DFS source vertex
-    if loop_iter is 2:
-        leader[v_key] = S.pop()
+    # Leader of a vertex is its DFS_G subroutine source vertex
+    if loop is 2:
+        LEADERS[v_key] = S[-1]
 
     v = G.get_v(v_key)
-    v_heads = v.get_tail_of_keys() if loop_iter is 2 else v.get_head_of_keys()
+    v_heads = v.get_tail_of_keys() if loop is 2 else v.get_head_of_keys()  # hmm
     for v_head in v_heads:
-        if v_head not in explored:
-            DFS_G(G, v_head, loop_iter)
+        if v_head not in EXPLORED:
+            DFS_G(G, v_head, loop)
 
-    # On 1st DFS loop, when v_key has no more outgoing arcs, t is incremented
-    # and recorded as the finishing time of v_key
-    if loop_iter is 1:
+    # When v_key has no more outoing arcs, t++ and record t as its finishing time
+    if loop is 1:
         t += 1
-        F[v_key] = t
+        F[v_key - 1] = t  # vector opt. of F assumes node labels are integers and 1-indexed
 
 
 # input: Graph, iteration of DFS loop (1 or 2)
-def DFS_loop(G, loop_iter):
-    global S, explored
-    explored = {}
+def DFS_loop(G, loop):
+    global F, S, EXPLORED
+    EXPLORED = {}
 
-    G_rev_keys = list(reversed(G.get_v_keys()))
-    for v_key in G_rev_keys:
-        if v_key not in explored:
-            S.append(v_key)
-            DFS_G(G, v_key, loop_iter)
+    if loop is 1:
+        keys = G.get_v_keys()
+        F = [None] * len(keys)
+        sorted_keys = list(reversed(keys))
+    else:
+        # Sorts nodes in reverse topological order, i.e. descending order of finishing times
+        i = [b[0] for b in sorted(enumerate(F), key=lambda i:i[1], reverse=True)]
+        sorted_keys = [x + 1 for x in i]
+        print('reverse toplogical order: ', sorted_keys)
+
+    for v_key in sorted_keys:
+        if v_key not in EXPLORED:
+            if loop is 2:
+                S.append(v_key)
+            DFS_G(G, v_key, loop)
 
 
-# input: Graph
+# input: Graph and number of SCC sizes to return
 # output: size of 5 largest SCCs
-def strongly_connected_components(G):
-    # 1) Run DFS loop on G backwards to topologically order nodes in dec. order of finishing times
+def strongly_connected_components(G, num):
+    # 1) Run DFS loop on G with reversed arcs to gather the searched finishing times of nodes in F
     DFS_loop(G, 1)
     print('F: ', F)
     print('t: ', t)
-    print('leader: ', leader)
-    print('S: ', S)
 
     # 1b) Now that we have the searched order finishing times of the first DFS, replace vertex keys
     # (i.e. node labels) with these rankings, so that when we now traverse the graph in the forward
@@ -310,10 +297,26 @@ def strongly_connected_components(G):
     # them in DFS_loop), potentially even starting with sink vertices which have no outgoing arcs
     # and are thus their own SCC.
 
-    # 2) Run DFS loop again on original G
+    # 2) Run DFS loop on G such that keys of vertices are replaced by their finishing times
     DFS_loop(G, 2)
+    print('S: ', S)
+    print('LEADERS: ', LEADERS)
+    return find_largest(num)
 
-    return []
+
+# Uses global 'leaders' object with vertex keys and their leader
+# input: number of SCC sizes to return
+# output: SCC sizes
+def find_largest(num):
+    SCCs = {}  # leader keys and their SCC size
+    for v in LEADERS:
+        leader = LEADERS[v]
+        SCCs[leader] = SCCs.get(leader, 0) + 1
+    print('SCCs: ', SCCs)
+
+    sizes = sorted(SCCs.values(), reverse=True)[:num]
+    result = sizes + ([0] * (num - len(sizes)))
+    return result
 
 
 graph_obj = preprocess_adj_list('scc_test_1.txt')
@@ -322,5 +325,5 @@ pprint.pprint(graph_obj, width=40)
 graph = create_graph(graph_obj)
 print(graph)
 
-result = strongly_connected_components(graph)
+result = strongly_connected_components(graph, 5)
 print(result)
