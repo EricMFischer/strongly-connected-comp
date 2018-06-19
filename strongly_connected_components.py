@@ -14,26 +14,6 @@ decreasing order of sizes, separated by commas (avoid any spaces). So if your al
 computes the sizes of the five largest SCCs to be 500, 400, 300, 200 and 100, then your
 answer should be "500,400,300,200,100" (without the quotes). If your algorithm finds less
 than 5 SCCs, then write 0 for the remaining terms.
-
-Random Notes:
-1) Iterative > recursive approach.
-2) For running times, use stack to store the vertices. Dictionary for times.
-3) Python list to represent graph and stacks. Thread stack size and recursion limit are important.
-4) Don't forget to count vertices with no outgoing arcs. If building a dictionary,
-with v -> e, e, e, such a dictionary should also contain vertices with no outgoing arcs.
-5) import sys sys.setrecursionlimit(1000000)
-6) Make sure to use iterative (for-loop) DFS implementation (BFS with stack instead of queue).
-The non-trivial trick here is to get the finishing times in iterative algorithm (something
-that you get for free with recursion).
-7) if __name__ == '__main__':
-sys.setrecursionlimit(2 ** 20)
-threading.stack_size(2 ** 26)
-thread = threading.Thread(target=DFS)
-thread.start()
-"When I moved on to the iterative version, I ran into the problem of counting finishing time
-(not as simple as it is in case of recursion). Any Python-ers here have any suggestions on
-how to either fix the global variable issues or correctly computing finishing time with
-an iterative DFS?"
 '''
 import pprint
 
@@ -234,29 +214,61 @@ t = 0  # increment when a node and its children have been fully explored
 F = []  # tracks node finishing times (e.g. [x,y,z] for 3 nodes labeled 1, 2, and 3)
 
 # 2nd DFS loop
-S = []  # append a node before DFS_G subroutine is called from it
+Q = []  # append a node before DFS_G subroutine is called from it
 LEADERS = {}  # tracks node "leaders", i.e. node DFS_G was called from to discover them
 
 
 # input: Graph, vertex key, iteration of DFS loop (1st or 2nd)
-def DFS_G(G, v_key, loop):
-    global t, EXPLORED
+def DFS_rec(G, v_key, loop):
+    global t, F, EXPLORED
     EXPLORED[v_key] = 1
 
     # Leader of a vertex is its DFS_G subroutine source vertex
     if loop is 2:
-        LEADERS[v_key] = S[-1]
+        LEADERS[v_key] = Q[-1]
 
     v = G.get_v(v_key)
-    v_heads = v.get_tail_of_keys() if loop is 2 else v.get_head_of_keys()  # hmm
+    v_heads = v.get_tail_of_keys() if loop is 2 else v.get_head_of_keys()
     for v_head in v_heads:
         if v_head not in EXPLORED:
-            DFS_G(G, v_head, loop)
+            DFS_rec(G, v_head, loop)
 
-    # When v_key has no more outoing arcs, t++ and record t as its finishing time
+    # When v_key has no more outgoing arcs, t++ and record t as its finishing time
     if loop is 1:
         t += 1
-        F[v_key - 1] = t  # vector opt. of F assumes node labels are integers and 1-indexed
+        F[v_key - 1] = t  # assumes node labels are integers 1-n
+
+
+# input: Graph, order of iteration for keys, iteration of DFS loop (1st or 2nd)
+def DFS_iterative(G, sorted_keys, loop):
+    global t, F, Q, EXPLORED
+
+    for key in sorted_keys:
+        Q.append(key)  # appends each key to an always-empty Q
+
+        while (Q):  # Q empties for each new leader vertex
+            v_key = Q.pop(0)  # removes the front key from Q as we deal with it
+
+            if v_key not in EXPLORED:
+                # adds that key back to beginning of Q if first time seen, but now marks
+                # it as explored (so next time we see it, after exploring all its children,
+                # we can record its finishing time)
+                Q = [v_key] + Q
+                EXPLORED[v_key] = 1
+                if loop is 2:
+                    print('Q: ', Q)
+                    LEADERS[v_key] = Q[-1]  # leader always at Q end; new leaders added to empty Q
+
+                v = G.get_v(v_key)
+                v_heads = v.get_head_of_keys() if loop is 1 else v.get_tail_of_keys()
+                for w in v_heads:
+                    if w not in EXPLORED:
+                        Q = [w] + Q  # adds all children to beginning of Q if never seen
+
+            else:
+                if F[v_key - 1] is None:
+                    t += 1
+                    F[v_key - 1] = t
 
 
 # input: Graph, iteration of DFS loop (1 or 2)
@@ -266,40 +278,42 @@ def DFS_loop(G, loop):
 
     if loop is 1:
         keys = G.get_v_keys()
-        F = [None] * len(keys)
         sorted_keys = list(reversed(keys))
+        F = [None] * len(keys)
     else:
         # Sorts nodes in reverse topological order, i.e. descending order of finishing times
         i = [b[0] for b in sorted(enumerate(F), key=lambda i:i[1], reverse=True)]
         sorted_keys = [x + 1 for x in i]
         print('reverse toplogical order: ', sorted_keys)
 
+    # Final solution with iterative DFS
+    DFS_iterative(G, sorted_keys, loop)
+
+    # Initial solution with recursive DFS
+    '''
     for v_key in sorted_keys:
         if v_key not in EXPLORED:
             if loop is 2:
-                S.append(v_key)
-            DFS_G(G, v_key, loop)
+                Q.append(v_key)
+            DFS_rec(G, v_key, loop)
+    '''
 
 
 # input: Graph and number of SCC sizes to return
 # output: size of 5 largest SCCs
 def strongly_connected_components(G, num):
-    # 1) Run DFS loop on G with reversed arcs to gather the searched finishing times of nodes in F
+    # 1) Run DFS traversing arcs backwards to gather searched finishing times of nodes in F
     DFS_loop(G, 1)
     print('F: ', F)
     print('t: ', t)
 
-    # 1b) Now that we have the searched order finishing times of the first DFS, replace vertex keys
-    # (i.e. node labels) with these rankings, so that when we now traverse the graph in the forward
-    # direction, but again in the order of n to 1 (which will thus be in decreasing order of
-    # finishing times), we'll start at the right nodes to find only 1 strongly connected component
-    # at a time (marking as 'explored' nodes that are part of 1 SCC so we don't ever call DFS from
-    # them in DFS_loop), potentially even starting with sink vertices which have no outgoing arcs
-    # and are thus their own SCC.
+    # 1b) Now that we have finishing times of first DFS, run DFS loop on G vertices in
+    # descending order of these times. This will allow us to find only 1 SCC at a time (marking
+    # as 'explored' nodes part of 1 SCC so we don't explore their children again), potentially
+    # even starting with sink vertices which have no outgoing arcs and are thus their own SCC.
 
-    # 2) Run DFS loop on G such that keys of vertices are replaced by their finishing times
+    # 2) Run DFS loop on G vertex keys in descending order of finishing times
     DFS_loop(G, 2)
-    print('S: ', S)
     print('LEADERS: ', LEADERS)
     return find_largest(num)
 
@@ -319,9 +333,8 @@ def find_largest(num):
     return result
 
 
-graph_obj = preprocess_adj_list('scc_test_1.txt')
+graph_obj = preprocess_adj_list('strongly_connected_components.txt')
 pprint.pprint(graph_obj, width=40)
-
 graph = create_graph(graph_obj)
 print(graph)
 
