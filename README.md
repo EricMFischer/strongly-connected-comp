@@ -16,7 +16,7 @@ answer should be "500,400,300,200,100" (without the quotes). If your algorithm f
 than 5 SCCs, then write 0 for the remaining terms.
 
 ## Motivation
-Kosaraju's strongly connected components algorithm for directed acyclic graphs has *O(m+n)* time complexity and demonstrates the utility of sink vertices for finding the maximal number of strongly connected components in a directed graph. Note that this algorith is one the 4 free primitive operations for computing useful information about a graph in linear time.
+Kosaraju's strongly connected components algorithm for directed acyclic graphs has *O(m+n)* time complexity and demonstrates the utility of sink vertices for finding the maximal number of strongly connected components in a directed graph. Note that this algorithm is one the 4 free primitive operations for computing useful information about a graph in linear time.
 
 ## Acknowledgements
 
