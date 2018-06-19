@@ -15,7 +15,10 @@ computes the sizes of the five largest SCCs to be 500, 400, 300, 200 and 100, th
 answer should be "500,400,300,200,100" (without the quotes). If your algorithm finds less
 than 5 SCCs, then write 0 for the remaining terms.
 '''
+import sys
+import threading
 import pprint
+import time
 
 
 # input: file name
@@ -246,7 +249,7 @@ def DFS_iterative(G, sorted_keys, loop):
     for key in sorted_keys:
         Q.append(key)  # appends each key to an always-empty Q
 
-        while (Q):  # Q empties for each new leader vertex
+        while (Q):  # Q empties for each new leader vertex, being populated with another key above
             v_key = Q.pop(0)  # removes the front key from Q as we deal with it
 
             if v_key not in EXPLORED:
@@ -256,7 +259,6 @@ def DFS_iterative(G, sorted_keys, loop):
                 Q = [v_key] + Q
                 EXPLORED[v_key] = 1
                 if loop is 2:
-                    print('Q: ', Q)
                     LEADERS[v_key] = Q[-1]  # leader always at Q end; new leaders added to empty Q
 
                 v = G.get_v(v_key)
@@ -266,14 +268,15 @@ def DFS_iterative(G, sorted_keys, loop):
                         Q = [w] + Q  # adds all children to beginning of Q if never seen
 
             else:
-                if F[v_key - 1] is None:
+                v_fin_time = F[v_key - 1]
+                if v_fin_time is None:
                     t += 1
-                    F[v_key - 1] = t
+                    v_fin_time = t
 
 
 # input: Graph, iteration of DFS loop (1 or 2)
 def DFS_loop(G, loop):
-    global F, S, EXPLORED
+    global F, Q, EXPLORED
     EXPLORED = {}
 
     if loop is 1:
@@ -282,21 +285,20 @@ def DFS_loop(G, loop):
         F = [None] * len(keys)
     else:
         # Sorts nodes in reverse topological order, i.e. descending order of finishing times
-        i = [b[0] for b in sorted(enumerate(F), key=lambda i:i[1], reverse=True)]
+        # i = [b[0] for b in sorted(enumerate(F), key=lambda i:i[1], reverse=True)]
+        i = sorted(range(len(F)), key=lambda k: F[k], reverse=True)
         sorted_keys = [x + 1 for x in i]
-        print('reverse toplogical order: ', sorted_keys)
+        # print('reverse toplogical order: ', sorted_keys)
 
-    # Final solution with iterative DFS
-    DFS_iterative(G, sorted_keys, loop)
-
-    # Initial solution with recursive DFS
-    '''
+    # Solution with recursive DFS
     for v_key in sorted_keys:
         if v_key not in EXPLORED:
             if loop is 2:
                 Q.append(v_key)
             DFS_rec(G, v_key, loop)
-    '''
+
+    # Solution with iterative DFS
+    # DFS_iterative(G, sorted_keys, loop)
 
 
 # input: Graph and number of SCC sizes to return
@@ -304,8 +306,8 @@ def DFS_loop(G, loop):
 def strongly_connected_components(G, num):
     # 1) Run DFS traversing arcs backwards to gather searched finishing times of nodes in F
     DFS_loop(G, 1)
-    print('F: ', F)
-    print('t: ', t)
+    # print('F: ', F)
+    # print('t: ', t)
 
     # 1b) Now that we have finishing times of first DFS, run DFS loop on G vertices in
     # descending order of these times. This will allow us to find only 1 SCC at a time (marking
@@ -314,7 +316,7 @@ def strongly_connected_components(G, num):
 
     # 2) Run DFS loop on G vertex keys in descending order of finishing times
     DFS_loop(G, 2)
-    print('LEADERS: ', LEADERS)
+    # print('LEADERS: ', LEADERS)
     return find_largest(num)
 
 
@@ -326,17 +328,27 @@ def find_largest(num):
     for v in LEADERS:
         leader = LEADERS[v]
         SCCs[leader] = SCCs.get(leader, 0) + 1
-    print('SCCs: ', SCCs)
+    # print('SCCs: ', SCCs)
 
     sizes = sorted(SCCs.values(), reverse=True)[:num]
-    result = sizes + ([0] * (num - len(sizes)))
-    return result
+    return sizes + ([0] * (num - len(sizes)))
 
 
-graph_obj = preprocess_adj_list('strongly_connected_components.txt')
-pprint.pprint(graph_obj, width=40)
-graph = create_graph(graph_obj)
-print(graph)
+sys.setrecursionlimit(800000)
+threading.stack_size(67108864)
 
-result = strongly_connected_components(graph, 5)
-print(result)
+
+def main():
+    graph_obj = preprocess_adj_list('strongly_connected_components.txt')
+    # pprint.pprint(graph_obj, width=40)
+    graph = create_graph(graph_obj)
+    # print(graph)
+
+    start = time.time()
+    result = strongly_connected_components(graph, 5)
+    print(result)
+    print('elapsed time: ', time.time() - start)
+
+
+thread = threading.Thread(target=main)
+thread.start()
