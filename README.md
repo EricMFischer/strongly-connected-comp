@@ -10,9 +10,7 @@ Your task is to code up the algorithm from the video lectures for computing stro
 connected components (SCCs), and to run this algorithm on the given graph.
 
 Output Format: You should output the sizes of the 5 largest SCCs in the given graph, in
-decreasing order of sizes, separated by commas (avoid any spaces). So if your algorithm
-computes the sizes of the five largest SCCs to be 500, 400, 300, 200 and 100, then your
-answer should be "500,400,300,200,100" (without the quotes). If your algorithm finds less
+decreasing order of sizes, separated by commas (avoid any spaces). If your algorithm finds less
 than 5 SCCs, then write 0 for the remaining terms.
 
 ## Motivation
