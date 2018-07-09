@@ -59,154 +59,151 @@ def create_graph(graph_obj):
 
 
 # Vertex class for directed graphs (object with 'key', 'tail_of', and 'head_of' keys)
-class Vertex(object):
+class Vertex():
     def __init__(self, key):
-        self.key = key
-        self.tail_of = {}
-        self.head_of = {}
+        self._key = key
+        self._tail_of = {}
+        self._head_of = {}
 
     def __str__(self):
-        return '{' + "'key': '{}', 'tail_of': {}, 'head_of': {}".format(
-            self.key,
-            self.tail_of,
-            self.head_of
+        return '{' + "'key': {}, 'tail_of': {}, 'head_of': {}".format(
+            self._key,
+            self._tail_of,
+            self._head_of
         ) + '}'
 
     def add_head(self, head_key, weight=1):
         if (head_key):
-            self.tail_of[head_key] = weight
+            self._tail_of[head_key] = weight
 
     def add_tail(self, tail_key, weight=1):
         if (tail_key):
-            self.head_of[tail_key] = weight
+            self._head_of[tail_key] = weight
 
     def tail_of(self, head_key):
-        return head_key in self.tail_of
+        return head_key in self._tail_of
 
     def head_of(self, tail_key):
-        return tail_key in self.head_of
+        return tail_key in self._head_of
 
     def get_tail_of_keys(self):
-        return list(self.tail_of.keys())
+        return list(self._tail_of.keys())
 
     def get_head_of_keys(self):
-        return list(self.head_of.keys())
+        return list(self._head_of.keys())
 
     def remove_tail(self, tail_key):
-        if tail_key in self.head_of:
-            del self.head_of[tail_key]
+        if tail_key in self._head_of:
+            del self._head_of[tail_key]
 
     def remove_head(self, head_key):
-        if head_key in self.tail_of:
-            del self.tail_of[head_key]
+        if head_key in self._tail_of:
+            del self._tail_of[head_key]
 
     def get_tail_weight(self, tail_key):
-        if tail_key in self.head_of:
-            return self.head_of[tail_key]
+        if tail_key in self._head_of:
+            return self._head_of[tail_key]
 
     def get_head_weight(self, head_key):
-        if head_key in self.tail_of:
-            return self.tail_of[head_key]
+        if head_key in self._tail_of:
+            return self._tail_of[head_key]
 
 
-# Graph class for directed graphs
-class Graph(object):
+# Directed graph class
+class Graph():
     def __init__(self):
-        self.vertices = {}
+        self._vertices = {}
 
     # 'x in graph' will use this containment logic
     def __contains__(self, key):
-        return key in self.vertices
+        return key in self._vertices
 
     # 'for x in graph' will use this iter() definition, where x is a vertex in an array
     def __iter__(self):
-        return iter(self.vertices.values())
+        return iter(self._vertices.values())
 
     def __str__(self):
         output = '\n{\n'
-        vertices = self.vertices.values()
+        vertices = self._vertices.values()
         for v in vertices:
-            graph_key = "'{}'".format(v.key)
-            v_str = "\n   'key': '{}', \n   'tail_of': {}, \n   'head_of': {}".format(
-                v.key,
-                v.tail_of,
-                v.head_of
+            graph_key = "{}".format(v._key)
+            v_str = "\n   'key': {}, \n   'tail_of': {}, \n   'head_of': {}".format(
+                v._key,
+                v._tail_of,
+                v._head_of
             )
             output += ' ' + graph_key + ': {' + v_str + '\n },\n'
         return output + '}'
 
     def add_v(self, v):
         if v:
-            self.vertices[v.key] = v
+            self._vertices[v._key] = v
         return self
 
     def get_v(self, key):
         try:
-            return self.vertices[key]
+            return self._vertices[key]
         except KeyError:
             return None
 
     def get_v_keys(self):
-        return list(self.vertices.keys())
+        return list(self._vertices.keys())
 
     # removes vertex as head and tail from all its neighbors, then deletes vertex
     def remove_v(self, key):
-        if key in self.vertices:
-            head_of_keys = self.vertices[key].get_head_of_keys()
-            tail_of_keys = self.vertices[key].get_tail_of_keys()
+        if key in self._vertices:
+            head_of_keys = self._vertices[key].get_head_of_keys()
+            tail_of_keys = self._vertices[key].get_tail_of_keys()
             for tail_key in head_of_keys:
                 self.remove_head(tail_key, key)
             for head_key in tail_of_keys:
                 self.remove_tail(key, head_key)
-            del self.vertices[key]
-        return self
+            del self._vertices[key]
 
-    def add_edge(self, tail_key, head_key, weight=1):
-        if tail_key not in self.vertices:
+    def add_e(self, tail_key, head_key, weight=1):
+        if tail_key not in self._vertices:
             self.add_v(Vertex(tail_key))
-        if head_key not in self.vertices:
+        if head_key not in self._vertices:
             self.add_v(Vertex(head_key))
 
-        self.vertices[tail_key].add_head(head_key, weight)
-        self.vertices[head_key].add_tail(tail_key, weight)
+        self._vertices[tail_key].add_head(head_key, weight)
+
+    def get_e(self, tail_key, head_key):
+        if tail_key and head_key in self._vertices:
+            return self.get_v(tail_key).get_e(head_key)
 
     # adds the weight for an edge if it exists already, with a default of 1
-    def increase_edge(self, tail_key, head_key, weight=1):
-        if tail_key not in self.vertices:
+    def increase_e(self, tail_key, head_key, weight=1):
+        if tail_key not in self._vertices:
             self.add_v(Vertex(tail_key))
-        if head_key not in self.vertices:
+        if head_key not in self._vertices:
             self.add_v(Vertex(head_key))
 
-        weight_v1_v2 = self.get_v(tail_key).get_head_weight(head_key)
-        new_weight_v1_v2 = weight_v1_v2 + weight if weight_v1_v2 else weight
+        w_v1_v2 = self.get_v(tail_key).get_head_weight(head_key)
+        new_w_v1_v2 = w_v1_v2 + weight if w_v1_v2 else weight
 
-        weight_v2_v1 = self.get_v(head_key).get_tail_weight(tail_key)
-        new_weight_v2_v1 = weight_v2_v1 + weight if weight_v2_v1 else weight
+        self._vertices[tail_key].add_head(head_key, new_w_v1_v2)
 
-        self.vertices[tail_key].add_head(head_key, new_weight_v1_v2)
-        self.vertices[head_key].add_tail(tail_key, new_weight_v2_v1)
-        return self
-
-    def has_forward_edge(self, tail_key, head_key):
-        if tail_key in self.vertices:
-            return self.vertices[tail_key].tail_of(head_key)
-
-    def remove_edge(self, tail_key, head_key):
-        if tail_key in self.vertices:
-            self.vertices[tail_key].remove_head(head_key)
-        if head_key in self.vertices:
-            self.vertices[head_key].remove_tail(tail_key)
+    def has_forward_e(self, tail_key, head_key):
+        if tail_key in self._vertices:
+            return self._vertices[tail_key].tail_of(head_key)
 
     def remove_tail(self, tail_key, head_key):
-        if head_key in self.vertices:
-            self.vertices[head_key].remove_tail(tail_key)
+        if head_key in self._vertices:
+            self._vertices[head_key].remove_tail(tail_key)
 
     def remove_head(self, tail_key, head_key):
-        if tail_key in self.vertices:
-            self.vertices[tail_key].remove_head(head_key)
+        if tail_key in self._vertices:
+            self._vertices[tail_key].remove_head(head_key)
+
+    def remove_e(self, tail_key, head_key):
+        if tail_key in self._vertices:
+            self._vertices[tail_key].remove_head(head_key)
+        if head_key in self._vertices:
+            self._vertices[head_key].remove_tail(tail_key)
 
     def for_each_v(self, cb):
-        for v in self.vertices:
+        for v in self._vertices:
             cb(v)
 
 
@@ -311,7 +308,7 @@ def strongly_connected_components(G, num):
 
     # 1b) Now that we have finishing times of first DFS, run DFS loop on G vertices in
     # descending order of these times. This will allow us to find only 1 SCC at a time (marking
-    # as 'explored' nodes part of 1 SCC so we don't explore their children again), potentially
+    # as 'explored' nodes in 1 SCC so we don't explore their children again), potentially
     # even starting with sink vertices which have no outgoing arcs and are thus their own SCC.
 
     # 2) Run DFS loop on G vertex keys in descending order of finishing times
@@ -334,15 +331,14 @@ def find_largest(num):
     return sizes + ([0] * (num - len(sizes)))
 
 
-sys.setrecursionlimit(800000)
-threading.stack_size(67108864)
-
-
 def main():
-    graph_obj = preprocess_adj_list('strongly_connected_components.txt')
+    graph_obj = preprocess_adj_list('scc_test_1.txt')
     # pprint.pprint(graph_obj, width=40)
     graph = create_graph(graph_obj)
-    # print(graph)
+    print(graph)
+
+    sys.setrecursionlimit(800000)
+    threading.stack_size(67108864)
 
     start = time.time()
     result = strongly_connected_components(graph, 5)
